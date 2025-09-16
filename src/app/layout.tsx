@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import PushNotificationsProvider from "@/components/push-notifications-provider";
+import { UserProvider } from "@/utils/useCurrentUser";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,10 +26,32 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* ... other meta tags ... */}
+
+        {/* iOS specific meta tags */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta
+          name="apple-mobile-web-app-status-bar-style"
+          content="black-translucent"
+        />
+        <meta name="apple-mobile-web-app-title" content="PND" />
+
+        {/* Add iOS icon links */}
+        <link rel="apple-touch-icon" href="/ios-icon-180.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/ios-icon-152.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/ios-icon-180.png" />
+        <link rel="apple-touch-icon" sizes="167x167" href="/ios-icon-167.png" />
+
+        {/* Add iOS splash screen images */}
+        <link rel="apple-touch-startup-image" href="/splash.png" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <UserProvider>
+          <PushNotificationsProvider>{children}</PushNotificationsProvider>
+        </UserProvider>
       </body>
     </html>
   );
