@@ -7,6 +7,7 @@ import { useCurrentUser } from "@/utils/useCurrentUser";
 import { DeviceTypes, isPWA, useDevice } from "@/utils/useDevice";
 import { PushNotificationsContext } from "./push-notifications-provider";
 import { fetchToken } from "@/lib/firebase";
+import { useRef } from "react";
 
 // Types
 interface ToastState {
@@ -73,6 +74,7 @@ const CircularProgressWithLabel: React.FC<CircularProgressProps> = ({
 };
 
 export const AutoNotificationSubscriber: React.FC = () => {
+  const subscribedRef = useRef(false);
   const messaging = useContext(PushNotificationsContext);
   const { user } = useCurrentUser();
   const [isLoading, setIsLoading] = useState(false);
@@ -191,25 +193,16 @@ export const AutoNotificationSubscriber: React.FC = () => {
 
   // Auto-request permission on component mount
   useEffect(() => {
-    const requestPermissionOnLoad = async () => {
-      if (!messaging) return;
+    if (!messaging) return;
+    if (subscribedRef.current) return; // already subscribed
 
-      const currentPermission = Notification.permission;
-      setPermissionStatus(currentPermission);
-
-      if (currentPermission !== "granted") {
-        await handleNotificationSubscription();
-      } else {
-        showToast("Notifications are already enabled", "info");
-        await handleNotificationSubscription();
-      }
+    const subscribe = async () => {
+      subscribedRef.current = true;
+      await handleNotificationSubscription();
     };
 
-    if ("Notification" in window) {
-      requestPermissionOnLoad();
-    }
-  }, [messaging, user, handleNotificationSubscription]);
-
+    subscribe();
+  }, [messaging, handleNotificationSubscription]); // now ESLint is happy
   return (
     <>
       {/* Status indicator */}

@@ -1,11 +1,26 @@
 import Image from "next/image";
+import NotificationForm from "@/components/send-notification";
 
 export default function Home() {
   return (
     <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex row-start-2 items-center sm:items-start">
+      <main className="flex flex-col row-start-2 items-center sm:items-start">
         hallo temen temen semua, sudah siap melanjutkan{" "}
-        <span className="text-orange-500"> petualangan </span> kemarin belum nih?
+        <span className="text-orange-500"> petualangan </span> kemarin belum
+        nih?
+        <div className="max-w-2xl mx-auto">
+          <h1 className="text-3xl font-bold text-center mb-8 text-white">
+            Push Notifications
+          </h1>
+
+          {/* Notification Form Section */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold mb-4 text-black">
+              Send Notification
+            </h2>
+            <NotificationForm />
+          </div>
+        </div>
       </main>
       <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
         <a

@@ -40,12 +40,10 @@ export default function NotificationForm() {
     }
 
     setIsSubmitting(true);
-    // No validation needed as we are sending hardcoded data
 
     try {
       const notificationData = {
         notificationTitle: "Hello from the app!",
-        firebaseToken: token,
         url: "https://example.com",
         notificationBody: "This is a manually sent notification.",
       };
