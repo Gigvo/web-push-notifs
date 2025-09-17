@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useContext, useEffect } from "react";
+import { useState, useContext, useEffect, useCallback } from "react";
 // import { getToken } from "firebase/messaging";
 import React from "react";
 import { useCurrentUser } from "@/utils/useCurrentUser";
@@ -94,7 +94,7 @@ export const AutoNotificationSubscriber: React.FC = () => {
     }, 4000);
   };
 
-  const handleNotificationSubscription = async () => {
+  const handleNotificationSubscription = useCallback(async () => {
     try {
       // Check if messaging is available
       if (!messaging) {
@@ -174,31 +174,32 @@ export const AutoNotificationSubscriber: React.FC = () => {
       }
 
       showToast("🎉 Notifications enabled successfully!", "success");
-    } catch (error: any) {
-      console.error("Subscription error:", error.message);
-      showToast(error.message || "Failed to enable notifications", "error");
+    } catch (error: unknown) {
+      let message = "Failed to enable notifications";
+      if (error instanceof Error) {
+        message = error.message;
+        console.error("Subscription error:", error);
+      } else {
+        console.error("Subscription error:", error);
+      }
+      showToast(message, "error");
     } finally {
       setIsLoading(false);
       setProgress(0);
     }
-  };
+  }, [messaging, user, device]);
 
   // Auto-request permission on component mount
   useEffect(() => {
     const requestPermissionOnLoad = async () => {
-      if (!messaging) {
-        console.log("Messaging not ready yet, skipping until available...");
-        return;
-      }
+      if (!messaging) return;
 
       const currentPermission = Notification.permission;
       setPermissionStatus(currentPermission);
 
       if (currentPermission !== "granted") {
-        // Ask for permission + subscribe
         await handleNotificationSubscription();
       } else {
-        // Already granted, still ensure subscription is up to date
         showToast("Notifications are already enabled", "info");
         await handleNotificationSubscription();
       }
@@ -206,10 +207,8 @@ export const AutoNotificationSubscriber: React.FC = () => {
 
     if ("Notification" in window) {
       requestPermissionOnLoad();
-    } else {
-      showToast("This browser doesn't support notifications", "error");
     }
-  }, [messaging, user]);
+  }, [messaging, user, handleNotificationSubscription]);
 
   return (
     <>

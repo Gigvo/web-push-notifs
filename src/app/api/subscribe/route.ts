@@ -39,10 +39,14 @@ export async function POST(req: Request) {
       success: true,
       message: `Subscribed to topic: ${topic}`,
     });
-  } catch (error: any) {
-    console.error("Error subscribing to topic:", error);
+  } catch (err: unknown) {
+    console.error("Error subscribing to topic:", err);
+
+    // Narrow the error type
+    const message = err instanceof Error ? err.message : "Unknown error";
+
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: message },
       { status: 500 }
     );
   }

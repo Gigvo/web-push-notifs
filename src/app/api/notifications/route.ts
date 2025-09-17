@@ -47,11 +47,13 @@ export async function POST(request: Request) {
     return NextResponse.json({
       message: "Notification sent successfully",
     });
-  } catch (error: any) {
-    console.error("Error sending notification:", error);
-    return NextResponse.json(
-      { error: error.message, details: error.stack },
-      { status: 500 }
-    );
+  } catch (err: unknown) {
+    console.error("Error sending notification:", err);
+
+    // Narrow the error type
+    const message =
+      err instanceof Error ? err.message : "An unknown error occurred";
+
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

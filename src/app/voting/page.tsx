@@ -1,15 +1,8 @@
 "use client";
 
 import NotificationForm from "@/components/send-notification";
-import { useCurrentUser } from "@/utils/useCurrentUser";
 
 export default function Home() {
-  const { token, user } = useCurrentUser();
-
-  const handleContentCopyClick = () => {
-    navigator.clipboard.writeText(user?.data.firebaseToken || "");
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-2xl mx-auto">

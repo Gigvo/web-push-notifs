@@ -17,7 +17,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     setToken(user.data.firebaseToken);
-  }, []);
+  }, [user.data.firebaseToken]);
 
   return (
     <UserContext.Provider value={{ token, user }}>

@@ -45,6 +45,10 @@ function getDeviceType(): DeviceTypes {
   return DeviceTypes.UNKNOWN;
 }
 
-export const isPWA = () =>
-  window.matchMedia("(display-mode: standalone)").matches ||
-  (window.navigator as any).standalone === true;
+export const isPWA = () => {
+  const nav = window.navigator as Navigator & { standalone?: boolean };
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    nav.standalone === true
+  );
+};
