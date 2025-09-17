@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useContext, useEffect } from "react";
-import { getToken } from "firebase/messaging";
+// import { getToken } from "firebase/messaging";
 import React from "react";
 import { useCurrentUser } from "@/utils/useCurrentUser";
 import { DeviceTypes, isPWA, useDevice } from "@/utils/useDevice";
 import { PushNotificationsContext } from "./push-notifications-provider";
+import { fetchToken } from "@/lib/firebase";
 
 // Types
 interface ToastState {
@@ -149,15 +150,27 @@ export const AutoNotificationSubscriber: React.FC = () => {
       setProgress(80);
 
       // Get Firebase token
-      const firebaseToken = await getToken(messaging, {
-        vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
-        serviceWorkerRegistration: registration,
+      const firebaseToken = await fetchToken();
+
+      const subscriptionResponse = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token: firebaseToken }),
       });
+
+      if (subscriptionResponse.ok) {
+        console.log("Successfully subscribed to topic");
+      } else {
+        console.error("Failed to subscribe to topic");
+      }
+
       setProgress(100);
 
       // Update user with token
       if (user) {
-        user.data.firebaseToken = firebaseToken;
+        user.data.firebaseToken = firebaseToken ?? undefined;
       }
 
       showToast("🎉 Notifications enabled successfully!", "success");
@@ -173,44 +186,30 @@ export const AutoNotificationSubscriber: React.FC = () => {
   // Auto-request permission on component mount
   useEffect(() => {
     const requestPermissionOnLoad = async () => {
-      // Wait for messaging to be initialized
       if (!messaging) {
-        console.log("Messaging not ready yet, waiting...");
-        return; // Exit early, useEffect will re-run when messaging is available
+        console.log("Messaging not ready yet, skipping until available...");
+        return;
       }
 
       const currentPermission = Notification.permission;
       setPermissionStatus(currentPermission);
 
-      // Always attempt to request permission if it's not granted
       if (currentPermission !== "granted") {
-        // Small delay to let the page load completely
-        setTimeout(async () => {
-          await handleNotificationSubscription();
-        }, 1000); // 1 second delay
+        // Ask for permission + subscribe
+        await handleNotificationSubscription();
       } else {
-        // If already granted, just show success message and setup token
+        // Already granted, still ensure subscription is up to date
         showToast("Notifications are already enabled", "info");
-        // Still run the subscription process to ensure token is updated
-        setTimeout(async () => {
-          await handleNotificationSubscription();
-        }, 500);
+        await handleNotificationSubscription();
       }
     };
 
-    // Only run if browser supports notifications and messaging is ready
-    if ("Notification" in window && messaging) {
+    if ("Notification" in window) {
       requestPermissionOnLoad();
-    } else if (!("Notification" in window)) {
+    } else {
       showToast("This browser doesn't support notifications", "error");
     }
-    // If messaging is not ready, this effect will re-run when it becomes available
-  }, [messaging, user]); // Dependencies - will re-run when messaging becomes available
-
-  // Manual retry function (can be used if needed)
-  const handleRetry = () => {
-    handleNotificationSubscription();
-  };
+  }, [messaging, user]);
 
   return (
     <>

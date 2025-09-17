@@ -39,7 +39,7 @@ export async function POST(request: Request) {
         body: body.notificationBody,
       },
       data: body.url ? { url: body.url } : undefined,
-      token: body.firebaseToken,
+      topic: "all-users",
     };
 
     await admin.messaging().send(payload);
