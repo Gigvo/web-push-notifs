@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { AutoNotificationSubscriber } from "./subscribe-button";
-import { useCurrentUser } from "@/utils/useCurrentUser";
+// import { useCurrentUser } from "@/utils/useCurrentUser";
 
 export default function NotificationForm() {
-  const [showForm, setShowForm] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // const [showForm, setShowForm] = useState(false);
+  // const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<{
     show: boolean;
     type: "success" | "error";
@@ -17,61 +17,61 @@ export default function NotificationForm() {
     message: "",
   });
 
-  const { token } = useCurrentUser();
+  // const { token } = useCurrentUser();
 
-  useEffect(() => {
-    if (token) {
-      setShowForm(true);
-    }
-  }, [token]);
+  // useEffect(() => {
+  //   if (token) {
+  //     setShowForm(true);
+  //   }
+  // }, [token]);
 
-  const showToast = (message: string, type: "success" | "error") => {
-    setToast({ show: true, type, message });
-    setTimeout(() => {
-      setToast((prev) => ({ ...prev, show: false }));
-    }, 3000);
-  };
+  // const showToast = (message: string, type: "success" | "error") => {
+  //   setToast({ show: true, type, message });
+  //   setTimeout(() => {
+  //     setToast((prev) => ({ ...prev, show: false }));
+  //   }, 3000);
+  // };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token) {
-      showToast("Firebase token is not available.", "error");
-      return;
-    }
+  // const handleSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   if (!token) {
+  //     showToast("Firebase token is not available.", "error");
+  //     return;
+  //   }
 
-    setIsSubmitting(true);
+  //   setIsSubmitting(true);
 
-    try {
-      const notificationData = {
-        notificationTitle: "Hello from the app!",
-        url: "https://example.com",
-        notificationBody: "This is a manually sent notification.",
-      };
-      const response = await fetch("/api/notifications", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(notificationData),
-      });
+  //   try {
+  //     const notificationData = {
+  //       notificationTitle: "Hello from the app!",
+  //       url: "https://example.com",
+  //       notificationBody: "This is a manually sent notification.",
+  //     };
+  //     const response = await fetch("/api/notifications", {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //       },
+  //       body: JSON.stringify(notificationData),
+  //     });
 
-      if (!response.ok) {
-        throw new Error("Failed to send notification.");
-      }
+  //     if (!response.ok) {
+  //       throw new Error("Failed to send notification.");
+  //     }
 
-      showToast("Notification sent successfully!", "success");
-    } catch (error) {
-      console.error("Error sending notification:", error);
-      showToast("Failed to send notification!", "error");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  //     showToast("Notification sent successfully!", "success");
+  //   } catch (error) {
+  //     console.error("Error sending notification:", error);
+  //     showToast("Failed to send notification!", "error");
+  //   } finally {
+  //     setIsSubmitting(false);
+  //   }
+  // };
 
   return (
     <>
       <AutoNotificationSubscriber />
-      {showForm && (
+      {/* {showForm && (
         <button
           onClick={handleSubmit}
           disabled={isSubmitting || !token}
@@ -86,7 +86,7 @@ export default function NotificationForm() {
             "Send Manual Notification"
           )}
         </button>
-      )}
+      )} */}
 
       {/* Toast Notification */}
       {toast.show && (

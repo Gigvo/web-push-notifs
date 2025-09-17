@@ -8,16 +8,9 @@ export default function Home() {
         hallo temen temen semua, sudah siap melanjutkan{" "}
         <span className="text-orange-500"> petualangan </span> kemarin belum
         nih?
-        <div className="max-w-2xl mx-auto">
-          <h1 className="text-3xl font-bold text-center mb-8 text-white">
-            Push Notifications
-          </h1>
-
-          {/* Notification Form Section */}
+        {/* Push Notif */}
+        <div className="max-w-2xl mx-auto my-20">
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4 text-black">
-              Send Notification
-            </h2>
             <NotificationForm />
           </div>
         </div>
