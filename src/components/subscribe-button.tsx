@@ -96,6 +96,41 @@ export const AutoNotificationSubscriber: React.FC = () => {
     }, 4000);
   };
 
+  // Helper function to check if notifications are actually available
+  const checkNotificationAvailability = async (): Promise<{
+    available: boolean;
+    permission: NotificationPermission;
+  }> => {
+    if (!("Notification" in window)) {
+      return { available: false, permission: "denied" };
+    }
+
+    // On iOS PWA, sometimes we need to check both the permission and try to create a test notification
+    const currentPermission = Notification.permission;
+
+    // If already granted, we're good
+    if (currentPermission === "granted") {
+      return { available: true, permission: currentPermission };
+    }
+
+    // If denied, respect that
+    if (currentPermission === "denied") {
+      return { available: false, permission: currentPermission };
+    }
+
+    // For default state, try requesting permission
+    try {
+      const newPermission = await Notification.requestPermission();
+      return {
+        available: newPermission === "granted",
+        permission: newPermission,
+      };
+    } catch (error) {
+      console.error("Error requesting notification permission:", error);
+      return { available: false, permission: "denied" };
+    }
+  };
+
   const handleNotificationSubscription = useCallback(async () => {
     try {
       // Check if messaging is available
@@ -114,19 +149,40 @@ export const AutoNotificationSubscriber: React.FC = () => {
       setIsLoading(true);
       setProgress(0);
 
-      // Request notification permission
+      // Check notification availability with improved iOS PWA handling
       setProgress(10);
-      const result = await Notification.requestPermission();
+      const { available, permission } = await checkNotificationAvailability();
       setProgress(20);
-      setPermissionStatus(result);
+      setPermissionStatus(permission);
 
-      if (result !== "granted") {
-        if (result === "denied") {
+      if (!available) {
+        if (permission === "denied") {
           throw new Error(
-            "Notifications were blocked. Please enable them in your browser settings."
+            "Notifications are disabled. Please enable them in your browser/device settings and refresh the page."
           );
         } else {
-          throw new Error("Notification permission was dismissed.");
+          throw new Error(
+            "Notifications are not supported on this device/browser."
+          );
+        }
+      }
+
+      // Additional check: On iOS, sometimes permission is "granted" but notifications still don't work
+      // Let's try to create a test notification (silent) to verify it actually works
+      if (device === DeviceTypes.IOS && isPWA()) {
+        try {
+          // This won't show a notification but will tell us if notifications actually work
+          const testNotification = new Notification("", {
+            silent: true,
+            tag: "test-notification",
+          });
+          testNotification.close(); // Close immediately
+        } catch (notificationError) {
+          console.warn(
+            "Test notification failed, but continuing:",
+            notificationError
+          );
+          // Continue anyway as this might still work with Firebase messaging
         }
       }
 
@@ -151,8 +207,38 @@ export const AutoNotificationSubscriber: React.FC = () => {
       await navigator.serviceWorker.ready;
       setProgress(80);
 
-      // Get Firebase token
-      const firebaseToken = await fetchToken();
+      // Get Firebase token with retry logic for iOS
+      let firebaseToken;
+      let retryCount = 0;
+      const maxRetries = 3;
+
+      while (retryCount < maxRetries) {
+        try {
+          firebaseToken = await fetchToken();
+          if (firebaseToken) break;
+        } catch (tokenError) {
+          console.warn(
+            `Token fetch attempt ${retryCount + 1} failed:`,
+            tokenError
+          );
+          retryCount++;
+
+          if (retryCount < maxRetries) {
+            // Wait a bit before retrying
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          } else {
+            throw new Error(
+              "Failed to get notification token. Please try again."
+            );
+          }
+        }
+      }
+
+      if (!firebaseToken) {
+        throw new Error(
+          "Unable to get notification token. Please check your internet connection and try again."
+        );
+      }
 
       const subscriptionResponse = await fetch("/api/subscribe", {
         method: "POST",
@@ -166,6 +252,10 @@ export const AutoNotificationSubscriber: React.FC = () => {
         console.log("Successfully subscribed to topic");
       } else {
         console.error("Failed to subscribe to topic");
+        // Don't throw error here as the token generation worked
+        console.warn(
+          "Subscription to topic failed but token was generated successfully"
+        );
       }
 
       setProgress(100);
@@ -194,15 +284,22 @@ export const AutoNotificationSubscriber: React.FC = () => {
   // Auto-request permission on component mount
   useEffect(() => {
     if (!messaging) return;
-    if (subscribedRef.current) return; // already subscribed
+    if (subscribedRef.current) return;
 
     const subscribe = async () => {
       subscribedRef.current = true;
+
+      // Add a small delay for iOS PWA to ensure everything is loaded
+      if (device === DeviceTypes.IOS && isPWA()) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
       await handleNotificationSubscription();
     };
 
     subscribe();
-  }, [messaging, handleNotificationSubscription]); // now ESLint is happy
+  }, [messaging, handleNotificationSubscription, device]);
+
   return (
     <>
       {/* Status indicator */}
@@ -237,7 +334,9 @@ export const AutoNotificationSubscriber: React.FC = () => {
             {permissionStatus !== "granted" && (
               <div className="text-sm text-gray-600">
                 {permissionStatus === "denied"
-                  ? "Enable in browser settings to receive notifications"
+                  ? device === DeviceTypes.IOS
+                    ? "Enable in Settings > Notifications for this app"
+                    : "Enable in browser settings to receive notifications"
                   : "Requesting permission..."}
               </div>
             )}

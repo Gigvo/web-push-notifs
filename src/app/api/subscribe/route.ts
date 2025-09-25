@@ -13,7 +13,7 @@ if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
       projectId,
-      privateKey: privateKey.replace(/\\n/g, "\n"), // fix escaped newlines
+      privateKey: privateKey.replace(/\\n/g, "\n"),
       clientEmail,
     }),
   });
