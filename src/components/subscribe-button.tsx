@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useContext, useEffect, useCallback } from "react";
-// import { getToken } from "firebase/messaging";
 import React from "react";
 import { useCurrentUser } from "@/utils/useCurrentUser";
 import { DeviceTypes, isPWA, useDevice } from "@/utils/useDevice";
@@ -40,7 +39,6 @@ const CircularProgressWithLabel: React.FC<CircularProgressProps> = ({
         className="transform -rotate-90"
         viewBox={`0 0 ${size} ${size}`}
       >
-        {/* Background circle */}
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -50,7 +48,6 @@ const CircularProgressWithLabel: React.FC<CircularProgressProps> = ({
           fill="none"
           className="text-white/30"
         />
-        {/* Progress circle */}
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -96,47 +93,12 @@ export const AutoNotificationSubscriber: React.FC = () => {
     }, 4000);
   };
 
-  // Helper function to check if notifications are actually available
-  const checkNotificationAvailability = async (): Promise<{
-    available: boolean;
-    permission: NotificationPermission;
-  }> => {
-    if (!("Notification" in window)) {
-      return { available: false, permission: "denied" };
-    }
-
-    // On iOS PWA, sometimes we need to check both the permission and try to create a test notification
-    const currentPermission = Notification.permission;
-
-    // If already granted, we're good
-    if (currentPermission === "granted") {
-      return { available: true, permission: currentPermission };
-    }
-
-    // If denied, respect that
-    if (currentPermission === "denied") {
-      return { available: false, permission: currentPermission };
-    }
-
-    // For default state, try requesting permission
-    try {
-      const newPermission = await Notification.requestPermission();
-      return {
-        available: newPermission === "granted",
-        permission: newPermission,
-      };
-    } catch (error) {
-      console.error("Error requesting notification permission:", error);
-      return { available: false, permission: "denied" };
-    }
-  };
-
   const handleNotificationSubscription = useCallback(async () => {
     try {
       // Check if messaging is available
       if (!messaging) {
         console.log("Messaging context not available, skipping subscription");
-        return; // Exit silently instead of throwing error
+        return;
       }
 
       // iOS PWA check
@@ -149,86 +111,96 @@ export const AutoNotificationSubscriber: React.FC = () => {
       setIsLoading(true);
       setProgress(0);
 
-      // Check notification availability with improved iOS PWA handling
-      setProgress(10);
-      const { available, permission } = await checkNotificationAvailability();
-      setProgress(20);
-      setPermissionStatus(permission);
-
-      if (!available) {
-        if (permission === "denied") {
-          throw new Error(
-            "Notifications are disabled. Please enable them in your browser/device settings and refresh the page."
-          );
-        } else {
-          throw new Error(
-            "Notifications are not supported on this device/browser."
-          );
-        }
+      // Basic browser support check
+      if (!("Notification" in window)) {
+        throw new Error("Notifications are not supported on this browser.");
       }
 
-      // Additional check: On iOS, sometimes permission is "granted" but notifications still don't work
-      // Let's try to create a test notification (silent) to verify it actually works
-      if (device === DeviceTypes.IOS && isPWA()) {
-        try {
-          // This won't show a notification but will tell us if notifications actually work
-          const testNotification = new Notification("", {
-            silent: true,
-            tag: "test-notification",
-          });
-          testNotification.close(); // Close immediately
-        } catch (notificationError) {
-          console.warn(
-            "Test notification failed, but continuing:",
-            notificationError
-          );
-          // Continue anyway as this might still work with Firebase messaging
-        }
-      }
-
-      // Check for service worker support
       if (!("serviceWorker" in navigator)) {
-        throw new Error("Service Workers unavailable");
+        throw new Error("Service Workers are not supported on this browser.");
       }
 
-      // Register or get service worker
+      setProgress(10);
+
+      // Register or get service worker FIRST (critical for iOS)
       let registration = await navigator.serviceWorker.getRegistration("/");
-      setProgress(40);
+      setProgress(20);
 
       if (!registration) {
+        console.log("Registering new service worker...");
         registration = await navigator.serviceWorker.register(
           "/firebase-messaging-sw.js",
           { scope: "/" }
         );
+        setProgress(30);
       }
+
+      // Wait for service worker to be ready (critical for iOS)
+      console.log("Waiting for service worker to be ready...");
+      await navigator.serviceWorker.ready;
+      setProgress(40);
+
+      // For iOS, add extra wait time to ensure service worker is fully active
+      if (device === DeviceTypes.IOS) {
+        console.log("iOS detected, waiting for service worker to stabilize...");
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
+      setProgress(50);
+
+      // Now check current permission status
+      const currentPermission = Notification.permission;
+      console.log("Current notification permission:", currentPermission);
+      setPermissionStatus(currentPermission);
+
+      // If permission is already denied, inform the user
+      if (currentPermission === "denied") {
+        throw new Error(
+          device === DeviceTypes.IOS
+            ? "Notifications are blocked. Go to Settings > [Your Browser/App Name] > Notifications and enable them, then restart the app."
+            : "Notifications are blocked. Please enable them in your browser settings and refresh the page."
+        );
+      }
+
       setProgress(60);
 
-      // Wait for service worker to be ready
-      await navigator.serviceWorker.ready;
-      setProgress(80);
-
-      // Get Firebase token with retry logic for iOS
+      // Get Firebase token (this will request permission if needed)
+      console.log("Fetching Firebase token...");
       let firebaseToken;
       let retryCount = 0;
       const maxRetries = 3;
 
       while (retryCount < maxRetries) {
         try {
+          // fetchToken will internally call Notification.requestPermission if needed
           firebaseToken = await fetchToken();
-          if (firebaseToken) break;
+
+          if (firebaseToken) {
+            console.log("Successfully obtained Firebase token");
+            break;
+          }
         } catch (tokenError) {
-          console.warn(
+          console.error(
             `Token fetch attempt ${retryCount + 1} failed:`,
             tokenError
           );
           retryCount++;
 
+          // Check if permission was denied during token fetch
+          if (Notification.permission === "denied") {
+            throw new Error(
+              device === DeviceTypes.IOS
+                ? "Notification permission was denied. Please enable notifications in your device settings."
+                : "Notification permission was denied. Please enable notifications in your browser settings."
+            );
+          }
+
           if (retryCount < maxRetries) {
-            // Wait a bit before retrying
+            console.log(`Waiting before retry ${retryCount + 1}...`);
             await new Promise((resolve) => setTimeout(resolve, 1000));
           } else {
             throw new Error(
-              "Failed to get notification token. Please try again."
+              "Failed to get notification token after multiple attempts. Please try again later."
             );
           }
         }
@@ -240,6 +212,13 @@ export const AutoNotificationSubscriber: React.FC = () => {
         );
       }
 
+      setProgress(80);
+
+      // Update permission status after successful token fetch
+      setPermissionStatus(Notification.permission);
+
+      // Subscribe to topic
+      console.log("Subscribing to topic...");
       const subscriptionResponse = await fetch("/api/subscribe", {
         method: "POST",
         headers: {
@@ -248,13 +227,15 @@ export const AutoNotificationSubscriber: React.FC = () => {
         body: JSON.stringify({ token: firebaseToken }),
       });
 
+      setProgress(90);
+
       if (subscriptionResponse.ok) {
         console.log("Successfully subscribed to topic");
       } else {
-        console.error("Failed to subscribe to topic");
-        // Don't throw error here as the token generation worked
-        console.warn(
-          "Subscription to topic failed but token was generated successfully"
+        const errorData = await subscriptionResponse.json();
+        console.error("Failed to subscribe to topic:", errorData);
+        throw new Error(
+          errorData.error || "Failed to subscribe to notifications"
         );
       }
 
@@ -274,6 +255,12 @@ export const AutoNotificationSubscriber: React.FC = () => {
       } else {
         console.error("Subscription error:", error);
       }
+
+      // Update permission status in case it changed
+      if ("Notification" in window) {
+        setPermissionStatus(Notification.permission);
+      }
+
       showToast(message, "error");
     } finally {
       setIsLoading(false);
@@ -289,9 +276,13 @@ export const AutoNotificationSubscriber: React.FC = () => {
     const subscribe = async () => {
       subscribedRef.current = true;
 
-      // Add a small delay for iOS PWA to ensure everything is loaded
+      // For iOS PWA, add a longer delay to ensure everything is loaded
       if (device === DeviceTypes.IOS && isPWA()) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        console.log("iOS PWA detected, waiting for initialization...");
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      } else {
+        // Small delay for other platforms too
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
 
       await handleNotificationSubscription();
@@ -299,6 +290,23 @@ export const AutoNotificationSubscriber: React.FC = () => {
 
     subscribe();
   }, [messaging, handleNotificationSubscription, device]);
+
+  // Monitor permission changes
+  useEffect(() => {
+    if (!("Notification" in window)) return;
+
+    const checkPermission = () => {
+      setPermissionStatus(Notification.permission);
+    };
+
+    // Check initially
+    checkPermission();
+
+    // Set up interval to check for permission changes (useful for iOS)
+    const interval = setInterval(checkPermission, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <>
@@ -335,8 +343,8 @@ export const AutoNotificationSubscriber: React.FC = () => {
               <div className="text-sm text-gray-600">
                 {permissionStatus === "denied"
                   ? device === DeviceTypes.IOS
-                    ? "Enable in Settings > Notifications for this app"
-                    : "Enable in browser settings to receive notifications"
+                    ? "Enable in Settings > Notifications"
+                    : "Enable in browser settings"
                   : "Requesting permission..."}
               </div>
             )}
@@ -357,7 +365,6 @@ export const AutoNotificationSubscriber: React.FC = () => {
         >
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-3">
-              {/* Icon */}
               <div className="flex-shrink-0 mt-0.5">
                 {toast.type === "success" ? (
                   <svg
@@ -398,13 +405,11 @@ export const AutoNotificationSubscriber: React.FC = () => {
                 )}
               </div>
 
-              {/* Message */}
               <div className="flex-1">
                 <p className="font-medium text-sm leading-5">{toast.message}</p>
               </div>
             </div>
 
-            {/* Close button */}
             <button
               onClick={() => setToast((prev) => ({ ...prev, show: false }))}
               className="flex-shrink-0 ml-4 text-white/80 hover:text-white transition-colors duration-200 focus:outline-none"
@@ -423,7 +428,6 @@ export const AutoNotificationSubscriber: React.FC = () => {
             </button>
           </div>
 
-          {/* Progress bar */}
           <div className="mt-3 w-full bg-white/20 rounded-full h-1">
             <div
               className="bg-white h-1 rounded-full transition-all duration-4000 ease-linear"
