@@ -23,54 +23,37 @@ if (!admin.apps.length) {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    // Check for API key in headers
-    const apiKey =
-      req.headers.get("x-api-key") ||
-      req.headers.get("authorization")?.replace("Bearer ", "");
-    const expectedApiKey = process.env.NOTIFICATION_API_KEY;
-
-    if (!expectedApiKey) {
+    const body = await request.json();
+    if (!body) {
       return NextResponse.json(
-        { success: false, error: "Server configuration error" },
-        { status: 500 }
-      );
-    }
-
-    if (!apiKey || apiKey !== expectedApiKey) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized - Invalid or missing API key" },
-        { status: 401 }
-      );
-    }
-
-    const body = await req.json();
-    const { token } = body;
-
-    if (!token) {
-      return NextResponse.json(
-        { success: false, error: "Missing token" },
+        { error: "Request body is required" },
         { status: 400 }
       );
     }
 
-    const topic = "all-users";
-    await admin.messaging().subscribeToTopic(token, topic);
+    const payload = {
+      notification: {
+        title: body.notificationTitle,
+        body: body.notificationBody,
+      },
+      data: body.url ? { url: body.url } : undefined,
+      topic: "all-users",
+    };
+
+    await admin.messaging().send(payload);
 
     return NextResponse.json({
-      success: true,
-      message: `Subscribed to topic: ${topic}`,
+      message: "Notification sent successfully",
     });
   } catch (err: unknown) {
-    console.error("Error subscribing to topic:", err);
+    console.error("Error sending notification:", err);
 
     // Narrow the error type
-    const message = err instanceof Error ? err.message : "Unknown error";
+    const message =
+      err instanceof Error ? err.message : "An unknown error occurred";
 
-    return NextResponse.json(
-      { success: false, error: message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
