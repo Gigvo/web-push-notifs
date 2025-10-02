@@ -23,37 +23,54 @@ if (!admin.apps.length) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const body = await request.json();
-    if (!body) {
+    // Check for API key in headers
+    const apiKey =
+      req.headers.get("x-api-key") ||
+      req.headers.get("authorization")?.replace("Bearer ", "");
+    const expectedApiKey = process.env.NOTIFICATION_API_KEY;
+
+    if (!expectedApiKey) {
       return NextResponse.json(
-        { error: "Request body is required" },
+        { success: false, error: "Server configuration error" },
+        { status: 500 }
+      );
+    }
+
+    if (!apiKey || apiKey !== expectedApiKey) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized - Invalid or missing API key" },
+        { status: 401 }
+      );
+    }
+
+    const body = await req.json();
+    const { token } = body;
+
+    if (!token) {
+      return NextResponse.json(
+        { success: false, error: "Missing token" },
         { status: 400 }
       );
     }
 
-    const payload = {
-      notification: {
-        title: body.notificationTitle,
-        body: body.notificationBody,
-      },
-      data: body.url ? { url: body.url } : undefined,
-      topic: "all-users",
-    };
-
-    await admin.messaging().send(payload);
+    const topic = "all-users";
+    await admin.messaging().subscribeToTopic(token, topic);
 
     return NextResponse.json({
-      message: "Notification sent successfully",
+      success: true,
+      message: `Subscribed to topic: ${topic}`,
     });
   } catch (err: unknown) {
-    console.error("Error sending notification:", err);
+    console.error("Error subscribing to topic:", err);
 
     // Narrow the error type
-    const message =
-      err instanceof Error ? err.message : "An unknown error occurred";
+    const message = err instanceof Error ? err.message : "Unknown error";
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: message },
+      { status: 500 }
+    );
   }
 }
