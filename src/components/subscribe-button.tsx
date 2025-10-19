@@ -26,17 +26,38 @@ export const NotificationSubscriber: React.FC = () => {
     return isIOS && isSafari;
   };
 
+  const shouldDisableButton = () => {
+    // Never disable for iOS Safari - always allow click for tutorial
+    if (device === DeviceTypes.IOS && !isPWA() && isIOSSafari()) {
+      return isLoading; // Only disable when actually loading
+    }
+
+    // For other cases, disable if loading or no messaging
+    return isLoading || !messaging;
+  };
+
+  const getButtonStyle = () => {
+    if (shouldDisableButton()) {
+      return "bg-gray-400 cursor-not-allowed";
+    }
+
+    if (isSubscribed) {
+      return "bg-red-500 hover:bg-red-600";
+    }
+
+    return "bg-blue-500 hover:bg-blue-600";
+  };
+
   const handleNotificationSubscription = async () => {
     try {
-      // Check if messaging is available
-      if (!messaging) {
-        console.log("Messaging context not available, skipping subscription");
-        return;
-      }
-
       // iOS PWA check
       if (device === DeviceTypes.IOS && !isPWA() && isIOSSafari()) {
         setShowIOSTutorial(true);
+        return;
+      }
+      // Check if messaging is available
+      if (!messaging) {
+        console.log("Messaging context not available, skipping subscription");
         return;
       }
 
@@ -190,16 +211,10 @@ export const NotificationSubscriber: React.FC = () => {
       {/* Simple Subscribe/Unsubscribe Button */}
       <button
         onClick={handleButtonClick}
-        disabled={isLoading || !messaging}
+        disabled={shouldDisableButton()}
         className={`
           px-6 py-3 rounded-lg font-medium text-white transition-all duration-200
-          ${
-            isLoading || !messaging
-              ? "bg-gray-400 cursor-not-allowed"
-              : isSubscribed
-              ? "bg-red-500 hover:bg-red-600"
-              : "bg-blue-500 hover:bg-blue-600"
-          }
+          ${getButtonStyle()}
         `}
       >
         {isLoading
