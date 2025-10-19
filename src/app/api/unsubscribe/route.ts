@@ -1,0 +1,57 @@
+import { NextResponse } from "next/server";
+import admin from "firebase-admin";
+
+if (!admin.apps.length) {
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+
+  if (!projectId || !privateKey || !clientEmail) {
+    throw new Error("Missing Firebase Admin credentials in environment");
+  }
+
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId,
+      privateKey: privateKey.replace(/\\n/g, "\n"), // fix escaped newlines
+      clientEmail,
+    }),
+  });
+}
+
+// ✅ Must be a named export (no default!)
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { token } = body;
+
+    console.log(
+      "Unsubscribe request received with token:",
+      token ? "Token present" : "No token"
+    );
+
+    if (!token) {
+      return NextResponse.json(
+        { success: false, error: "Missing token" },
+        { status: 400 }
+      );
+    }
+
+    const topic = "all-users";
+    console.log(`Attempting to unsubscribe token from topic: ${topic}`);
+
+    const result = await admin.messaging().unsubscribeFromTopic(token, topic);
+    console.log("Unsubscribe result:", result);
+
+    return NextResponse.json({
+      success: true,
+      message: `Unsubscribed from topic: ${topic}`,
+    });
+  } catch (error: any) {
+    console.error("Error unsubscribing from topic:", error);
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+}

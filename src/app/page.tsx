@@ -1,5 +1,5 @@
 import Image from "next/image";
-import NotificationForm from "@/components/send-notification";
+import NotificationSubscriber from "@/components/subscribe-button";
 
 export default function Home() {
   return (
@@ -11,7 +11,7 @@ export default function Home() {
         {/* Push Notif */}
         <div className="max-w-2xl mx-auto my-20">
           <div className="bg-white rounded-lg shadow p-6">
-            <NotificationForm />
+            <NotificationSubscriber />
           </div>
         </div>
       </main>
